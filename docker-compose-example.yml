@@ -1,0 +1,24 @@
+name: "your-web-obsidian"
+
+services:
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    container_name: obsidian
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Shanghai
+      - DOCKER_MODS=linuxserver/mods:universal-package-install
+      - CUSTOM_USER=${CUSTOM_USER:-admin}
+      - PASSWORD=${PASSWORD:-password123}
+    volumes:
+      - ${APP_DIR}/config:/config
+      - ${APP_DIR}:/vault
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "8082:8082"
+    shm_size: "1gb"
+    restart: unless-stopped
