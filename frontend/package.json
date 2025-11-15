@@ -7,7 +7,7 @@
     "build": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^latest",
-    "electron-builder": "^latest"
+    "electron": "latest",
+    "electron-builder": "latest"
   }
 }
