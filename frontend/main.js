@@ -24,7 +24,10 @@ function loadEnv() {
             if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
               val = val.substring(1, val.length - 1)
             }
-            if (key) process.env[key] = val
+            // 仅当父进程/环境尚未提供该变量时，才从文件写入到 process.env
+            if (key && (typeof process.env[key] === 'undefined' || process.env[key] === null || process.env[key] === '')) {
+              process.env[key] = val
+            }
           })
           console.log('Loaded env from', f)
           return
@@ -51,19 +54,35 @@ if (missing.length > 0) {
 }
 
 function createWindow() {
+  // 允许通过环境变量自定义初始大小和是否全屏
+  const initWidth = parseInt(process.env.FRONTEND_WIDTH || '1200', 10)
+  const initHeight = parseInt(process.env.FRONTEND_HEIGHT || '800', 10)
+  const startFullscreen = (process.env.FRONTEND_FULLSCREEN === '1')
+
+  // 窗口标题可通过环境变量 `FRONTEND_TITLE` 自定义（默认 'work_space'）
+  // 示例：在启动前设置 $env:FRONTEND_TITLE = 'My Title' 或在 start 脚本中导出
+  const windowTitle = process.env.FRONTEND_TITLE || 'work_space'
+
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: initWidth,
+    height: initHeight,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
       allowRunningInsecureContent: true
     },
-    titleBarStyle: 'hidden',
-    frame: false,
-    fullscreen: true,
+    // 使用系统原生标题栏（frame:true）以支持窗口拖拽和原生窗口控制
+    // 如果想使用无边框自定义标题栏，可改为 `frame: false` 并在前端页面实现拖拽区域。
+    titleBarStyle: 'default',
+    frame: true,
+    fullscreen: !!startFullscreen,
     autoHideMenuBar: true
+    ,
+    title: windowTitle
   })
 
   // 完全隐藏菜单
@@ -97,9 +116,25 @@ function createWindow() {
     console.log('DOM 已就绪')
   })
 
+  // 支持通过 F11 切换全屏（在无系统标题栏时提供快捷切换）
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    try {
+      if (input.key === 'F11') {
+        const fs = mainWindow.isFullScreen()
+        mainWindow.setFullScreen(!fs)
+        event.preventDefault()
+      }
+    } catch (e) {
+      console.warn('before-input-event handler error', e)
+    }
+  })
+
   // 加载你的网站
   const tailIp = process.env.TAILSCALE_IP
-  const baseUrl = `https://${tailIp}:3001/`
+  // 支持可配置端口：FRONTEND_PORT（例如 3001 使用 https，3000 使用 http）
+  const port = process.env.FRONTEND_PORT || '3001'
+  const proto = (port === '3000') ? 'http' : 'https'
+  const baseUrl = `${proto}://${tailIp}:${port}/`
   mainWindow.loadURL(baseUrl)
     .then(() => {
       console.log('页面加载成功')

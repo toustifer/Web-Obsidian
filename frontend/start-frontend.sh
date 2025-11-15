@@ -33,6 +33,26 @@ if [ "${1-}" = "--install" ] || [ ! -d "$DIR/node_modules" ]; then
   (cd "$DIR" && npm install)
 fi
 
+# 本机可达性检测：优先使用本地地址（127.0.0.1）和合适的端口
+LOCAL_FOUND=0
+code=$(curl -sSk -o /dev/null -w "%{http_code}" --max-time 3 https://127.0.0.1:3001/ || echo "000")
+if [ "$code" != "000" ]; then
+  echo "Detected local HTTPS service at 127.0.0.1:3001 (HTTP $code). Using local address."
+  export TAILSCALE_IP=127.0.0.1
+  export FRONTEND_PORT=3001
+  LOCAL_FOUND=1
+else
+  code2=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:3000/ || echo "000")
+  if [ "$code2" != "000" ]; then
+    echo "Detected local HTTP service at 127.0.0.1:3000 (HTTP $code2). Using local address."
+    export TAILSCALE_IP=127.0.0.1
+    export FRONTEND_PORT=3000
+    LOCAL_FOUND=1
+  fi
+else
+  echo "No local service detected on 127.0.0.1:3001/3000; will use configured TAILSCALE_IP."
+fi
+
 echo "Running npm start..."
 cd "$DIR"
 exec npm start
